@@ -1,0 +1,150 @@
+﻿@page "/alunos"
+@rendermode InteractiveServer
+
+@if (alunos == null)
+{
+  <FluentProgressRing Style="width:30px;height:30px" />
+}
+else
+{
+   @*  <FluentStack>
+        <FluentButton Appearance="Appearance.Neutral"
+                      IconStart="@Icon.FromImageUrl("/images/add.svg")"> 
+            Novo Aluno
+        </FluentButton>
+    </FluentStack> *@
+
+    <FluentStack HorizontalAlignment="HorizontalAlignment.End">
+        <FluentAnchor Href="/aluno-form"
+                      IconStart="@(new Icons.Regular.Size24.PersonAdd().WithColor(Color.Success))">
+            Novo Aluno
+        </FluentAnchor>
+    </FluentStack>
+
+    <div class="grid">
+    <FluentDataGrid Id="alunogrid" Items=@alunos TGridItem=Aluno Pagination="@pagination">
+           <TemplateColumn Title="Avatar" Align="Align.Start">
+                @if (@context.Foto is not null)
+                {
+                    <FluentPersona ImageSize ="50px" Image="@context.Foto" />
+                }
+                else
+                {
+                    <FluentPersona ImageSize="50px"  Initials="@context!.Nome[0]!.ToString().ToUpper()" />
+                }
+            </TemplateColumn>
+        <PropertyColumn Title="Nome" Property="@(c => c!.Nome)" Sortable="true" Align=Align.Start/>
+        <PropertyColumn Title="Email" Property="@(c => c!.Email)" Sortable="true" Align=Align.Start/>
+        <PropertyColumn Title="Idade" Property="@(c => c!.Idade)" Sortable="true" Align=Align.Center/>
+        <TemplateColumn Align="@Align.End">
+            <FluentButton Appearance="Appearance.Outline" OnClick="()=>ConfirmarExclusao(context.Id)"
+                          IconStart="@(new Icons.Regular.Size24.Delete().WithColor(Color.Error))">Deleta</FluentButton>
+
+            <FluentAnchor IconStart="@(new Icons.Regular.Size24.Edit().WithColor(Color.Success))"
+                          Appearance="Appearance.Outline"
+                          Href="@($"/aluno-form/{context.Id}")">Edita</FluentAnchor>
+        </TemplateColumn>
+    </FluentDataGrid>
+    </div>
+    <br />
+    <div class="page-buttons" >
+       
+        @if (pagination.TotalItemCount.HasValue)
+        {
+            for (var pageIndex = 0; pageIndex <= pagination.LastPageIndex; pageIndex++)
+            {
+                var capturedIndex = pageIndex;
+                <FluentButton @onclick="@(() => GoToPageAsync(capturedIndex))"
+                              Appearance="@PageButtonAppearance(capturedIndex)"
+                              aria-current="@AriaCurrentValue(capturedIndex)"
+                              aria-label="@AriaLabel(capturedIndex + 1)">
+                    @(capturedIndex + 1)
+                </FluentButton>
+            }
+        }
+    </div>
+}
+
+@code {
+    private IQueryable<Aluno>? alunos;
+
+    PaginationState pagination = new PaginationState { ItemsPerPage = 3 };
+
+    // Neste exemplo, AsQueryable() é um método de extensão que converte a 
+    // lista para um IQueryable. No entanto, a execução da consulta ocorrerá 
+    // no lado do cliente, o que pode não ser eficiente se você estiver usando
+    // um banco de dados remoto.
+    // Se a sua intenção é obter um IQueryable<Aluno> diretamente da fonte de 
+    // dados no seu serviço (_alunoService), talvez seja necessário ajustar o 
+    // método GetAlunos para retornar IQueryable<Aluno> em vez de List<Aluno>. 
+    // Caso contrário, se você já tem uma lista e precisa operar sobre ela como
+    // IQueryable, a conversão é possível, mas a execução da consulta pode ser 
+    // menos eficiente.
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.Delay(1000);
+        await CarregaAlunos();
+        pagination.TotalItemCountChanged += (sender, eventArgs) => StateHasChanged();
+        await base.OnInitializedAsync();
+    }
+
+    private async Task CarregaAlunos()
+    {
+        var alunosList = await _alunoService.GetAlunos();
+        alunos = alunosList?.AsQueryable();
+    }
+
+    private async Task ConfirmarExclusao(int id)
+    {
+        var dialog = await DialogService
+                          .ShowConfirmationAsync($"Confirma exclusão do aluno de id={id} ?",
+                          "Sim", "Não", "Deletar Aluno");
+
+        var result = await dialog.Result;
+
+        if (!result.Cancelled)
+        {
+            await Delete(id);
+        }
+        else
+        {
+            ToastService.ShowInfo($"Operação cancelada");
+        }
+    }
+
+    private async Task Delete(int id)
+    {
+        var aluno = await _alunoService.GetAluno(id);
+
+        if (aluno is null)
+        {
+            ToastService.ShowError($"Aluno com id={id} não encontrado");
+            return;
+        }
+
+        var result = await _alunoService.DeleteAluno(aluno.Id);
+
+        if (result is not null)
+        {
+            ToastService.ShowSuccess("Aluno excluído com sucesso!");
+            await CarregaAlunos();
+        }
+        else
+        {
+            ToastService.ShowError($"Não foi possível excluir o aluno com id={id}");
+        }
+    }
+
+    private async Task GoToPageAsync(int pageIndex)
+    {
+        await pagination.SetCurrentPageIndexAsync(pageIndex);
+    }
+
+    private Appearance PageButtonAppearance(int pageIndex)
+        => pagination.CurrentPageIndex == pageIndex ? Appearance.Accent : Appearance.Neutral;
+
+    private string? AriaCurrentValue(int pageIndex)
+        => pagination.CurrentPageIndex == pageIndex ? "page" : null;
+
+    private string AriaLabel(int pageIndex) => $"Ir para pag. {pageIndex}";
+}

@@ -1,0 +1,80 @@
+﻿@page "/aluno-form"
+@page "/aluno-form/{Id:int}"
+@rendermode InteractiveServer
+
+<PageTitle>
+    @pageTitle
+</PageTitle>
+
+<FluentGrid Justify="@JustifyContent.Center">
+    <FluentGridItem>
+        <FluentCard>
+                <FluentLabel Alignment="HorizontalAlignment.Center">
+                    @pageTitle
+                </FluentLabel>
+
+            <EditForm Model="Aluno">
+                <FluentTextField Appearance="FluentInputAppearance.Filled" 
+                                 Label="Aluno" @bind-Value="Aluno!.Nome" Style="width:100%" />
+
+                <FluentTextField Appearance="FluentInputAppearance.Filled" 
+                                 Label="Email" Style="width:100%"  @bind-Value="Aluno!.Email" />
+
+                <FluentNumberField Appearance="FluentInputAppearance.Filled"
+                                 Label="Idade" Style="width:100%" @bind-Value="Aluno!.Idade" />
+
+                <FluentTextField Appearance="FluentInputAppearance.Filled"
+                                 Label="Foto" Style="width:100%" @bind-Value="Aluno!.Foto" />
+
+                <FluentButton Appearance="Appearance.Accent" OnClick="()=>SaveAluno()">
+                    @pageTitle
+                </FluentButton>
+
+                <FluentAnchor Href="/alunos"> Cancela</FluentAnchor>
+            </EditForm>
+
+        </FluentCard>
+    </FluentGridItem>
+</FluentGrid>
+
+@code {
+
+    [Parameter]
+    public int? Id { get; set; } = -1;
+
+    private string pageTitle => Id != null ? "Edita Aluno" : "Novo Aluno";
+
+    [SupplyParameterFromForm]
+    public Aluno? Aluno { get; set; } = new Aluno();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Id is null)
+        {
+            Aluno = new Aluno();
+        }
+        else
+        {
+            Aluno = await _alunoService.GetAluno(Id);
+        }
+        await base.OnInitializedAsync();
+    }
+
+    private async Task SaveAluno()
+    {
+        if (Id != null)
+        {
+            await _alunoService.UpdateAluno(Aluno!);
+            DialogService.ShowSuccess($"Aluno {Aluno!.Nome} atualizado com sucesso");
+        }
+        else
+        {
+            await _alunoService.AddAluno(Aluno!);
+            DialogService.ShowSuccess($"Aluno {Aluno!.Nome} incluido com sucesso");
+        }
+
+        ToastService.ShowInfo($"Retornando para lista de alunos");
+        await Task.Delay(1500);
+        NavigationManager.NavigateTo("/alunos");
+    }
+}
